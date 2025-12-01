@@ -17,6 +17,17 @@ class OBJModel:
         self.batches = []
         
         self._load_obj(filename)
+        # self._build_meshes() # Defer building meshes until after optional centering
+
+    def get_center(self):
+        if not self.vertices: return (0,0,0)
+        # Calculate center
+        min_v = np.min(self.vertices, axis=0)
+        max_v = np.max(self.vertices, axis=0)
+        center = (min_v + max_v) / 2.0
+        return center
+
+    def build(self):
         self._build_meshes()
 
     def _load_obj(self, filename):

@@ -51,6 +51,7 @@ uniform vec3 uMaterialAmbient;
 uniform vec3 uMaterialDiffuse;
 uniform vec3 uMaterialSpecular;
 uniform float uMaterialShininess;
+uniform float uMaterialAlpha;
 
 uniform sampler2D uTexture;
 uniform bool uHasTexture;
@@ -86,7 +87,7 @@ void main(){
     for(int i = 0; i < NR_LIGHTS; i++)
         result += CalcLight(lights[i], norm, viewDir, albedo);
         
-    fragColor = vec4(result, 1.0);
+    fragColor = vec4(result, uMaterialAlpha);
 }
 """
 
@@ -114,6 +115,7 @@ class ShaderProgram:
         self.loc_mat_diff = glGetUniformLocation(self.prog, "uMaterialDiffuse")
         self.loc_mat_spec = glGetUniformLocation(self.prog, "uMaterialSpecular")
         self.loc_mat_shiny = glGetUniformLocation(self.prog, "uMaterialShininess")
+        self.loc_mat_alpha = glGetUniformLocation(self.prog, "uMaterialAlpha")
         
         self.loc_has_tex = glGetUniformLocation(self.prog, "uHasTexture")
         self.loc_tex = glGetUniformLocation(self.prog, "uTexture")
@@ -147,11 +149,12 @@ class ShaderProgram:
     def set_view_pos(self, pos):
         glUniform3fv(self.loc_uViewPos, 1, np.array(pos, dtype=np.float32))
 
-    def set_material(self, ambient, diffuse, specular, shininess, texture_id=None):
+    def set_material(self, ambient, diffuse, specular, shininess, alpha=1.0, texture_id=None):
         glUniform3fv(self.loc_mat_amb, 1, np.array(ambient, dtype=np.float32))
         glUniform3fv(self.loc_mat_diff, 1, np.array(diffuse, dtype=np.float32))
         glUniform3fv(self.loc_mat_spec, 1, np.array(specular, dtype=np.float32))
         glUniform1f(self.loc_mat_shiny, shininess)
+        glUniform1f(self.loc_mat_alpha, alpha)
         
         if texture_id is not None:
             glUniform1i(self.loc_has_tex, 1)

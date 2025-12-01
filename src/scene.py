@@ -58,7 +58,8 @@ class Node:
                  material_ambient=(0.2, 0.2, 0.2),
                  material_diffuse=(0.8, 0.8, 0.8),
                  material_specular=(1.0, 1.0, 1.0),
-                 material_shininess=32.0):
+                 material_shininess=32.0,
+                 material_alpha=1.0):
         self.name = name
         self.local = np.array(local if local is not None else np.eye(4, dtype=np.float32), dtype=np.float32)
         self.children = []
@@ -69,6 +70,7 @@ class Node:
         self.mat_diffuse = material_diffuse
         self.mat_specular = material_specular
         self.mat_shininess = material_shininess
+        self.mat_alpha = material_alpha
 
     def add(self, *children):
         for c in children: self.children.append(c)
@@ -81,6 +83,7 @@ class Node:
             shader.set_transform_uniforms(world, VP)
             shader.set_material(self.mat_ambient, self.mat_diffuse, 
                               self.mat_specular, self.mat_shininess, 
+                              self.mat_alpha,
                               self.mesh.texture_id)
             self.mesh.draw()
             
