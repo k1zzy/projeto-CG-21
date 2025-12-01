@@ -14,7 +14,7 @@ from obj_loader import OBJModel
 # Constants
 WIN_WIDTH = 1280
 WIN_HEIGHT = 720
-TITLE = "Projecto CG - Carro e Garagem"
+TITLE = "Projecto CG - Grupo 21"
 
 class CarController:
     def __init__(self, root_node, chassis, wheels, steering_wheel, doors):
