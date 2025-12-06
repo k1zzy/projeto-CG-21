@@ -17,11 +17,11 @@ class OBJModel:
         self.batches = []
         
         self._load_obj(filename)
-        # self._build_meshes() # Defer building meshes until after optional centering
+        # self._build_meshes() # Adiar construcao de malhas ate depois da centralizacao opcional
 
     def get_center(self):
         if not self.vertices: return (0,0,0)
-        # Calculate center
+        # Calcular centro
         min_v = np.min(self.vertices, axis=0)
         max_v = np.max(self.vertices, axis=0)
         center = (min_v + max_v) / 2.0
@@ -69,7 +69,7 @@ class OBJModel:
                             vn_idx = resolve_index(tokens[2], len(self.normals)) if len(tokens) > 2 else -1
                             face_verts.append((v_idx, vt_idx, vn_idx))
                         
-                        # Triangulate
+                        # Triangular
                         for i in range(1, len(face_verts) - 1):
                             self.faces.append({
                                 "material": current_material,
@@ -125,9 +125,9 @@ class OBJModel:
             if mat not in temp_batches: temp_batches[mat] = []
             
             verts = face["verts"]
-            # Calculate flat normal if missing
-            if all(v[2] < 0 for v in verts): # simplified check
-                # ... (normal calculation omitted for brevity, assuming normals exist or 0,1,0)
+            # Calcular normal flat se em falta
+            if all(v[2] < 0 for v in verts): # verificacao simplificada
+                # ... (calculo de normais omitido por brevidade, assumindo normais existentes ou 0,1,0)
                 fn = (0, 1, 0)
             else: fn = (0, 1, 0)
 

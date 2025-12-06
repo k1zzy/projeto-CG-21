@@ -29,7 +29,7 @@ class Mesh:
         # Stride: 3 pos + 3 norm + 2 uv = 8 floats * 4 bytes = 32 bytes
         stride = 8 * 4
         
-        # Position (loc 0)
+        # Posicao (loc 0)
         glEnableVertexAttribArray(0)
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
         
@@ -58,6 +58,7 @@ class Node:
                  material_ambient=(0.2, 0.2, 0.2),
                  material_diffuse=(0.8, 0.8, 0.8),
                  material_specular=(1.0, 1.0, 1.0),
+                 material_emission=(0.0, 0.0, 0.0),
                  material_shininess=32.0,
                  material_alpha=1.0):
         self.name = name
@@ -65,10 +66,11 @@ class Node:
         self.children = []
         self.mesh = mesh
         
-        # Material properties
+        # Propriedades do material
         self.mat_ambient = material_ambient
         self.mat_diffuse = material_diffuse
         self.mat_specular = material_specular
+        self.mat_emission = material_emission
         self.mat_shininess = material_shininess
         self.mat_alpha = material_alpha
 
@@ -84,19 +86,20 @@ class Node:
             shader.set_material(self.mat_ambient, self.mat_diffuse, 
                               self.mat_specular, self.mat_shininess, 
                               self.mat_alpha,
-                              self.mesh.texture_id)
+                              self.mesh.texture_id,
+                              self.mat_emission)
             self.mesh.draw()
             
         for c in self.children:
             c.draw(shader, world, VP)
 
 def create_grid_mesh(size=100, tiles=20):
-    # Create a floor grid
+    # Criar uma grelha de chao
     # vertices: x, y, z, nx, ny, nz, u, v
     verts = []
     step = size / tiles
     
-    # We'll create quads for each tile
+    # Vamos criar quads para cada tile
     for i in range(tiles):
         for j in range(tiles):
             x0 = -size/2 + i*step
@@ -109,24 +112,15 @@ def create_grid_mesh(size=100, tiles=20):
             u1 = i+1
             v1 = j+1
             
-            # Normal is always up (0, 1, 0)
-            # Quad vertices (2 triangles)
-            # v0, v1, v2, v0, v2, v3
+            # Normal e sempre para cima (0, 1, 0)
+            # Quad vertices (2 triangulos)
             
-            # p0 = (x0, 0, z0)
-            # p1 = (x1, 0, z0)
-            # p2 = (x1, 0, z1)
-            # p3 = (x0, 0, z1)
-            
-            # Add 4 vertices for this quad (we can reuse them with indices or just duplicate for simplicity)
-            # Let's just generate triangles directly to keep it simple
-            
-            # Triangle 1
+            # Triangulo 1
             verts.extend([x0, 0, z0, 0, 1, 0, 0, 0])
             verts.extend([x0, 0, z1, 0, 1, 0, 0, 1])
             verts.extend([x1, 0, z0, 0, 1, 0, 1, 0])
             
-            # Triangle 2
+            # Triangulo 2
             verts.extend([x1, 0, z0, 0, 1, 0, 1, 0])
             verts.extend([x0, 0, z1, 0, 1, 0, 0, 1])
             verts.extend([x1, 0, z1, 0, 1, 0, 1, 1])

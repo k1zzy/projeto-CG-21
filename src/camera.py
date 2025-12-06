@@ -11,8 +11,8 @@ class Camera:
         self.center = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         self.up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
         
-        # Free Cam
-        self.mode = "ORBIT" # ORBIT or FREE
+        # Camara Livre
+        self.mode = "ORBIT" # ORBIT ou FREE
         self.position = np.array([0.0, 5.0, 10.0], dtype=np.float32)
         self.yaw = -90.0
         self.pitch = 0.0
@@ -28,14 +28,14 @@ class Camera:
 
     def zoom(self, factor):
         if self.mode == "ORBIT":
-            # Scale both radius and height to maintain angle
+            # Escalar raio e altura para manter o angulo
             new_radius = self.radius * factor
             new_height = self.height * factor
             
-            # Clamp based on radius
+            # Limitar baseado no raio
             if new_radius < 2.0: 
                 new_radius = 2.0
-                new_height = 2.0 * (self.height / self.radius) # Maintain ratio at limit
+                new_height = 2.0 * (self.height / self.radius) # Manter racio no limite
             if new_radius > 100.0: 
                 new_radius = 100.0
                 new_height = 100.0 * (self.height / self.radius)
@@ -46,10 +46,10 @@ class Camera:
     def toggle_mode(self):
         if self.mode == "ORBIT":
             self.mode = "FREE"
-            # Set free cam pos to current orbit pos
+            # Definir pos da camara livre para a pos orbital atual
             view, eye = self.get_view_matrix()
             self.position = eye
-            # Reset orientation to look at center (approx)
+            # Resetar orientacao para olhar para o centro (aprox)
             direction = self.center - self.position
             direction /= np.linalg.norm(direction)
             self.pitch = math.degrees(math.asin(direction[1]))
@@ -60,7 +60,7 @@ class Camera:
     def update_free_cam(self, dt, inputs, d_mouse):
         if self.mode != "FREE": return
 
-        # Mouse Look
+        # Visao com Rato
         dx, dy = d_mouse
         self.yaw += dx * self.sensitivity
         self.pitch -= dy * self.sensitivity
@@ -68,7 +68,7 @@ class Camera:
         if self.pitch > 89.0: self.pitch = 89.0
         if self.pitch < -89.0: self.pitch = -89.0
         
-        # Update vectors
+        # Atualizar vetores
         front = np.array([
             math.cos(math.radians(self.yaw)) * math.cos(math.radians(self.pitch)),
             math.sin(math.radians(self.pitch)),
@@ -80,14 +80,14 @@ class Camera:
         self.up = np.cross(self.right, self.front)
         self.up /= np.linalg.norm(self.up)
         
-        # Movement
+        # Movimento
         velocity = self.speed * dt
         if inputs['w']: self.position += self.front * velocity
         if inputs['s']: self.position -= self.front * velocity
         if inputs['a']: self.position -= self.right * velocity
         if inputs['d']: self.position += self.right * velocity
-        if inputs.get('q'): self.position -= self.world_up * velocity # Down
-        if inputs.get('e'): self.position += self.world_up * velocity # Up
+        if inputs.get('q'): self.position -= self.world_up * velocity # Baixo
+        if inputs.get('e'): self.position += self.world_up * velocity # Cima
 
     def get_view_matrix(self):
         if self.mode == "ORBIT":
