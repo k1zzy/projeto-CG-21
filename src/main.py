@@ -393,6 +393,11 @@ def main():
             if key == glfw.KEY_O: garage_ctrl.toggle()
             if key == glfw.KEY_P: car_ctrl.toggle_door()
             if key == glfw.KEY_1: inputs['1'] = not inputs['1'] # Toggle ao pressionar
+            if key == glfw.KEY_2:
+                if camera.mode == "FIRST_PERSON":
+                    camera.mode = "ORBIT"
+                else:
+                    camera.mode = "FIRST_PERSON"
             if key == glfw.KEY_C: camera.toggle_mode()
             
         elif action == glfw.RELEASE:
@@ -454,24 +459,53 @@ def main():
         else:
             car_ctrl.update(dt, inputs)
             
-            # Camara Inteligente (Smart Follow Camera)
-            # Angulo base e o yaw do carro (mais 180 pois o modelo foi rodado)
-            base_angle = math.degrees(car_ctrl.yaw) + 180
-            
-            # Input do rato adiciona a um angulo offset
-            if mouse_dx != 0:
-                camera.angle_offset = getattr(camera, 'angle_offset', 0.0) - mouse_dx * 0.2
-                camera.last_mouse_time = t
-            
-            # Auto-alinhar se sem input por 2 segundos
-            if t - getattr(camera, 'last_mouse_time', 0.0) > 2.0:
-                # Decair offset para 0
-                offset = getattr(camera, 'angle_offset', 0.0)
-                camera.angle_offset = offset * (1.0 - 5.0 * dt) # Decaimento suave
-                if abs(camera.angle_offset) < 0.1: camera.angle_offset = 0.0
-            
-            camera.angle = base_angle + getattr(camera, 'angle_offset', 0.0)
-            camera.center = car_ctrl.position
+            if camera.mode == "FIRST_PERSON":
+                # Posicao da Cabeca (Driver Head)
+                # Offset relativo ao CarOrient (que esta rodado 180)
+                # Seat: (-0.30, -0.25, -0.2). Volante Z: -0.6.
+                # Cabeca anterior: -0.25.
+                # Ajuste: Mover para tras (Direcao +Z Local do CarOrient, pois -Z e Frente World)
+                # Tentativa: 0.1 (Mais para tras que -0.25)
+                head_local = np.array([-0.30, 0.40, 0.1, 1.0], dtype=np.float32)
+                
+                # Transformacao para World
+                # 1. CarOrient (Rotate 180 Y)
+                # 2. CarRoot (Translate Pos + Rotate Yaw)
+                
+                car_rot = rotate(car_ctrl.yaw, (0, 1, 0))
+                mesh_orient = rotate(math.radians(180), (0, 1, 0))
+                
+                total_rot = car_rot @ mesh_orient
+                
+                head_pos_rel = total_rot @ head_local
+                head_world = car_ctrl.position + head_pos_rel[:3]
+                
+                camera.position = head_world
+                
+                # Forward vector alinhado com o carro
+                cy = car_ctrl.yaw
+                camera.front = np.array([math.sin(cy), 0, math.cos(cy)], dtype=np.float32)
+                camera.up = np.array([0, 1, 0], dtype=np.float32)
+                
+            else:
+                # Camara Inteligente (Smart Follow Camera)
+                # Angulo base e o yaw do carro (mais 180 pois o modelo foi rodado)
+                base_angle = math.degrees(car_ctrl.yaw) + 180
+                
+                # Input do rato adiciona a um angulo offset
+                if mouse_dx != 0:
+                    camera.angle_offset = getattr(camera, 'angle_offset', 0.0) - mouse_dx * 0.2
+                    camera.last_mouse_time = t
+                
+                # Auto-alinhar se sem input por 2 segundos
+                if t - getattr(camera, 'last_mouse_time', 0.0) > 2.0:
+                    # Decair offset para 0
+                    offset = getattr(camera, 'angle_offset', 0.0)
+                    camera.angle_offset = offset * (1.0 - 5.0 * dt) # Decaimento suave
+                    if abs(camera.angle_offset) < 0.1: camera.angle_offset = 0.0
+                
+                camera.angle = base_angle + getattr(camera, 'angle_offset', 0.0)
+                camera.center = car_ctrl.position
             
         mouse_dx, mouse_dy = 0, 0 # Reset delta
         
@@ -484,7 +518,10 @@ def main():
         width, height = glfw.get_framebuffer_size(window)
         glViewport(0, 0, width, height)
         
-        P = perspective(60.0, width/height, 0.1, 1000.0)
+        # FOV Dinamico
+        current_fov = 90.0 if camera.mode == "FIRST_PERSON" else 60.0
+        
+        P = perspective(current_fov, width/height, 0.1, 1000.0)
         V, eye_pos = camera.get_view_matrix()
         VP = P @ V
         

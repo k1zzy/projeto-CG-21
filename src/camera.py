@@ -99,4 +99,6 @@ class Camera:
             eye = np.array([eye_x, eye_y, eye_z], dtype=np.float32)
             return lookAt(eye, self.center, self.up), eye
         else:
+            # FREE, FIRST_PERSON, etc.
+            # Assuma que 'position' e 'front' estao atualizados
             return lookAt(self.position, self.position + self.front, self.up), self.position
