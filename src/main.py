@@ -28,8 +28,13 @@ class CarController:
         self.speed = 0.0
         self.steering_angle = 0.0
         
-        self.door_open = False
-        self.door_angle = 0.0
+        # Estados das Portas (4 independentes)
+        self.door_states = {
+            'frente_esquerda': {'open': False, 'angle': 0.0},
+            'frente_direita': {'open': False, 'angle': 0.0},
+            'tras_esquerda': {'open': False, 'angle': 0.0},
+            'tras_direita': {'open': False, 'angle': 0.0}
+        }
         
         # Configuracao
         self.max_speed = 10.0
@@ -101,24 +106,24 @@ class CarController:
         if self.steering_wheel:
             self.steering_wheel.local = rotate(math.radians(self.steering_angle * 3), (0, 0, 1))
 
-        # Portas
-        target_door = 45.0 if self.door_open else 0.0
-        self.door_angle += (target_door - self.door_angle) * 2.0 * dt
-        
+        # Portas Logic (4 independentes)
         for key, (node, center) in self.doors.items():
-            angle = self.door_angle
-            # Left doors (-Angle to open OUT), Right doors (+Angle to open OUT)
-            if 'esquerda' in key: angle = -angle
-            if 'direita' in key: angle = angle # Positive for Right
-            
-            # Ajuste de direcao especifico se necessario.
-            # Se Esquerda abre 'para dentro', inverter.
-            
-            rot_mat = rotate(math.radians(angle), (0, 1, 0))
-            node.local = get_pivot_transform(center, rot_mat)
+            if key in self.door_states:
+                state = self.door_states[key]
+                target = 45.0 if state['open'] else 0.0
+                state['angle'] += (target - state['angle']) * 2.0 * dt
+                
+                if 'esquerda' in key:
+                    final_angle = -state['angle'] # Negative for Left OUT
+                elif 'direita' in key:
+                    final_angle = state['angle'] # Positive for Right OUT
+                
+                rot_mat = rotate(math.radians(final_angle), (0, 1, 0))
+                node.local = get_pivot_transform(center, rot_mat)
 
-    def toggle_door(self):
-        self.door_open = not self.door_open
+    def toggle_door(self, door_key):
+        if door_key in self.door_states:
+            self.door_states[door_key]['open'] = not self.door_states[door_key]['open']
 
 class GarageController:
     def __init__(self, door_node):
@@ -391,7 +396,13 @@ def main():
             if key == glfw.KEY_E: inputs['e'] = True
             
             if key == glfw.KEY_O: garage_ctrl.toggle()
-            if key == glfw.KEY_P: car_ctrl.toggle_door()
+            # if key == glfw.KEY_P: car_ctrl.toggle_door() # Removido para usar 3, 4, 5, 6
+            
+            if key == glfw.KEY_3: car_ctrl.toggle_door('frente_direita')
+            if key == glfw.KEY_4: car_ctrl.toggle_door('frente_esquerda')
+            if key == glfw.KEY_5: car_ctrl.toggle_door('tras_direita')
+            if key == glfw.KEY_6: car_ctrl.toggle_door('tras_esquerda')
+            
             if key == glfw.KEY_1: inputs['1'] = not inputs['1'] # Toggle ao pressionar
             if key == glfw.KEY_2:
                 if camera.mode == "FIRST_PERSON":
