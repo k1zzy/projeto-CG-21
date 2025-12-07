@@ -27,6 +27,12 @@ class OBJModel:
         center = (min_v + max_v) / 2.0
         return center
 
+    def get_bounds(self):
+        if not self.vertices: return (0,0,0), (0,0,0)
+        min_v = np.min(self.vertices, axis=0)
+        max_v = np.max(self.vertices, axis=0)
+        return min_v, max_v
+
     def build(self):
         self._build_meshes()
 

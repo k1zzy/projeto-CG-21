@@ -16,17 +16,14 @@ WIN_HEIGHT = 720
 TITLE = "Projecto CG - Grupo 21"
 
 class CarController:
-    def __init__(self, root_node, chassis, front_axle, rear_axle, front_pivot, rear_pivot, steering_wheel, doors):
+    def __init__(self, root_node, chassis, wheels_dict, doors_dict, steering_wheel):
         self.root = root_node
         self.chassis = chassis
-        self.front_axle = front_axle
-        self.rear_axle = rear_axle
-        self.front_pivot = front_pivot
-        self.rear_pivot = rear_pivot
+        self.wheels = wheels_dict # {'fl': ..., 'fr': ...}
+        self.doors = doors_dict   # {'fl': ..., 'fr': ...}
         self.steering_wheel = steering_wheel
-        self.doors = doors # [Esquerda, Direita]
         
-        self.position = np.array([0.0, 1.2, 0.0], dtype=np.float32)
+        self.position = np.array([0.0, 0.65, 0.0], dtype=np.float32)
         self.yaw = 0.0
         self.speed = 0.0
         self.steering_angle = 0.0
@@ -80,40 +77,45 @@ class CarController:
         
         # Auxiliar para rotacao de pivo: T(P) * R * T(-P)
         def get_pivot_transform(pivot, rotation_matrix):
-            # Queremos rodar em torno do ponto de pivo (centro do eixo)
-            # O no ja esta em (0,0,0) com vertices deslocados.
-            # Se vertices estao em V, e queremos rodar em P.
-            # NewV = T(P) * R * T(-P) * V
             return translate(pivot[0], pivot[1], pivot[2]) @ \
                    rotation_matrix @ \
                    translate(-pivot[0], -pivot[1], -pivot[2])
 
-        # Eixo da Frente (Direcao + Rolamento)
-        if not hasattr(self.front_axle, 'roll_angle'): self.front_axle.roll_angle = 0.0
-        self.front_axle.roll_angle += wheel_rot_speed * dt * 10.0
-        
-        front_rot = rotate(math.radians(self.steering_angle), (0, 1, 0)) @ \
-                    rotate(self.front_axle.roll_angle, (1, 0, 0))
-        
-        self.front_axle.local = get_pivot_transform(self.front_pivot, front_rot)
-
-        # Eixo de Tras (Apenas Rolamento)
-        if not hasattr(self.rear_axle, 'roll_angle'): self.rear_axle.roll_angle = 0.0
-        self.rear_axle.roll_angle += wheel_rot_speed * 0.66 * dt * 10.0 # Rodas maiores
-        
-        rear_rot = rotate(self.rear_axle.roll_angle, (1, 0, 0))
-        self.rear_axle.local = get_pivot_transform(self.rear_pivot, rear_rot)
+        for key, (node, center) in self.wheels.items():
+            if not hasattr(node, 'roll_angle'): node.roll_angle = 0.0
+            
+            # Rodas de tras maiores?
+            radius_factor = 0.66 if 'tras' in key else 1.0
+            node.roll_angle += wheel_rot_speed * radius_factor * dt * 10.0
+            
+            steer = 0.0
+            if 'frente' in key:
+                steer = self.steering_angle
+                
+            rot_mat = rotate(math.radians(steer), (0, 1, 0)) @ \
+                      rotate(node.roll_angle, (1, 0, 0))
+            
+            node.local = get_pivot_transform(center, rot_mat)
 
         # Atualizar Volante
         if self.steering_wheel:
-            # Ajustar eixo de rotacao/direcao conforme necessario para o modelo
             self.steering_wheel.local = rotate(math.radians(self.steering_angle * 3), (0, 0, 1))
 
         # Portas
         target_door = 45.0 if self.door_open else 0.0
         self.door_angle += (target_door - self.door_angle) * 2.0 * dt
-        for door in self.doors:
-            door.local = rotate(math.radians(self.door_angle), (0, 1, 0))
+        
+        for key, (node, center) in self.doors.items():
+            angle = self.door_angle
+            # Left doors (-Angle to open OUT), Right doors (+Angle to open OUT)
+            if 'esquerda' in key: angle = -angle
+            if 'direita' in key: angle = angle # Positive for Right
+            
+            # Ajuste de direcao especifico se necessario.
+            # Se Esquerda abre 'para dentro', inverter.
+            
+            rot_mat = rotate(math.radians(angle), (0, 1, 0))
+            node.local = get_pivot_transform(center, rot_mat)
 
     def toggle_door(self):
         self.door_open = not self.door_open
@@ -150,10 +152,10 @@ def load_obj_node(path, name, color=None, alpha=1.0, specular=(1,1,1), shininess
             for c in n.children: set_props(c)
             
         set_props(node)
-        return node, c
+        return node, model
     except Exception as e:
         print(f"Falha ao carregar {path}: {e}")
-        return Node(name), (0,0,0)
+        return Node(name), None
 
 def main():
     if not glfw.init():
@@ -209,33 +211,157 @@ def main():
     # Luzes
     luz_frente, _ = load_obj_node("../models/luz_frente.obj", "LuzFrente", color=(1.0, 1.0, 0.9))
     luz_tras, _ = load_obj_node("../models/luz_tras.obj", "LuzTras", color=(0.8, 0.0, 0.0))
+    luz_tras, _ = load_obj_node("../models/luz_tras.obj", "LuzTras", color=(0.8, 0.0, 0.0))
     car_orient.add(luz_frente, luz_tras)
-    
-    # Retrovisores
-    retrovisores, _ = load_obj_node("../models/retrovisores_fora.obj", "Retrovisores", color=(0.1, 0.1, 0.1))
-    car_orient.add(retrovisores)
-    
-    # Rodas (Preto Metalico) - Usando abordagem de Eixo
-    # Carregar Eixo da Frente
-    front_axle, front_center = load_obj_node("../models/rodas_frente.obj", "FrontAxle", 
-                                             color=(0.1, 0.1, 0.1), specular=(0.8, 0.8, 0.8), shininess=32.0, center=True)
-    car_orient.add(front_axle)
-    
-    # Carregar Eixo de Tras
-    rear_axle, rear_center = load_obj_node("../models/rodas_tras.obj", "RearAxle", 
-                                           color=(0.1, 0.1, 0.1), specular=(0.8, 0.8, 0.8), shininess=32.0, center=True)
-    car_orient.add(rear_axle)
 
-    # Vidros (Transparente) - Movido para o fim para blending correto
+    # --- CONFIGURACAO DO INTERIOR (AJUSTE AQUI) ---
+    
+    # 1. BANCO (RACING SEAT)
+    # Posicao: (X, Y, Z) -> X=Lateral, Y=Altura, Z=Frente/Tras
+    seat_pos = (-0.30, -0.25, -0.2) 
+    
+    # Escala: Tamanho do banco
+    seat_scale = 0.075 # Reduzido para 1/4 de 0.15
+    
+    # Rotacao: Ajuste se o banco estiver virado para o lado errado
+    seat_rot_y = 90.0 # Graus (Rodar 90 para a esquerda)
+
+    seat_mount = Node("SeatMount", local=translate(seat_pos[0], seat_pos[1], seat_pos[2]) @ \
+                                         rotate(math.radians(seat_rot_y), (0, 1, 0)) @ \
+                                         scale(seat_scale, seat_scale, seat_scale))
+    seat_node, seat_model = load_obj_node("../models/racing_seat_completed.obj", "RacingSeat", 
+                                          color=(0.2, 0.2, 0.2), specular=(0.5, 0.5, 0.5), shininess=16.0, center=True)
+    seat_mount.add(seat_node)
+    car_orient.add(seat_mount)
+
+    # 2. VOLANTE
+    volante_node, volante_model = load_obj_node("../models/volante.obj", "Volante", 
+                                                color=(0.1, 0.1, 0.1), specular=(0.8, 0.8, 0.8), shininess=64.0, center=True)
+    
+    # Posicao: (X, Y, Z)
+    vol_pos = (-0.30, 0.25, -0.6) 
+    
+    # Escala
+    vol_scale = 0.65 
+    
+    # Inclinacao: Graus (ajustar angulo da coluna de direcao)
+    vol_tilt = 20.0
+    
+    volante_mount = Node("VolanteMount", local=translate(vol_pos[0], vol_pos[1], vol_pos[2]) @ \
+                                               rotate(math.radians(vol_tilt), (1, 0, 0)) @ \
+                                               scale(vol_scale, vol_scale, vol_scale))
+    
+    volante_mount.add(volante_node)
+    car_orient.add(volante_mount)
+    
+    # --- Rodas (Separadas) ---
+    wheels = {}
+    wheel_files = {
+        'frente_esquerda': 'roda_frente_esquerda',
+        'frente_direita': 'roda_frente_direita',
+        'tras_esquerda': 'roda_tras_esquerda',
+        'tras_direita': 'roda_tras_direita'
+    }
+    
+    for key, name in wheel_files.items():
+        # Carregar e centrar logicamente
+        node, model = load_obj_node(f"../models/{name}.obj", name, 
+                                     color=(0.1, 0.1, 0.1), specular=(0.8, 0.8, 0.8), shininess=32.0, center=True)
+        
+        # Pivot da roda e o seu centro geometrico
+        center = model.get_center()
+
+        # Mount Identity (Assumindo vertices globais)
+        mount = Node(name + "_Mount") 
+        mount.add(node)
+        car_orient.add(mount)
+        
+        wheels[key] = (mount, center)
+
+    # --- Portas (Separadas) ---
+    doors = {}
+    door_files = {
+        'frente_esquerda': 'porta_frente_esquerda',
+        'frente_direita': 'porta_frente_direita',
+        'tras_esquerda': 'porta_tras_esquerda',
+        'tras_direita': 'porta_tras_direita'
+    }
+    
+    # Mapeamento de vidros e retrovisores para cada porta
+    glass_files = {
+        'frente_esquerda': 'vidro_porta_frente_esquerdo',
+        'frente_direita': 'vidro_porta_frente_direito',
+        'tras_esquerda': 'vidro_porta_tras_esquerdo',
+        'tras_direita': 'vidro_porta_tras_direito'
+    }
+    
+    mirror_files = {
+        'frente_esquerda': 'retrovisor_fora_esquerda',
+        'frente_direita': 'retrovisor_fora_direita'
+    }
+
+    for key, name in door_files.items():
+        # Carregar porta
+        door_node, door_model = load_obj_node(f"../models/{name}.obj", name, 
+                                               color=(0.8, 0.0, 0.0), specular=(1.0, 1.0, 1.0), shininess=64.0, center=True)
+        
+        # Calcular Pivot baseado nos limites (Bounding Box)
+        # Esquerda -> Min X, Direita -> Max X
+        # Hinge (Dobradica) -> Provavelmente no 'Frente' do carro (Min Z ou Max Z).
+        # Assumindo Min Z como frente (com base em OpenGL padrao). 
+        # Experimentar Min Z para pivot Z.
+        min_v, max_v = door_model.get_bounds()
+        center = door_model.get_center()
+        
+        pivot_x = center[0]
+        if 'esquerda' in key: pivot_x = min_v[0]
+        elif 'direita' in key: pivot_x = max_v[0]
+        
+        # Ajustar Z para a ponta da porta (assumindo que a porta e "comprida" em Z)
+        # Se as portas abrem 'normalmente', a dobradica e na frente.
+        # Vamos tentar Min Z (Frente?). Se for portas de tras, talvez Max Z?
+        # Por agora, Min Z para todas.
+        pivot_z = min_v[2] # Tentativa de dobradica na frente
+            
+        pivot = (pivot_x, center[1], pivot_z)
+        
+        
+        mount = Node(name + "_Mount") # Identity transform
+        mount.add(door_node)
+        car_orient.add(mount)
+        
+        doors[key] = (mount, pivot)
+        
+        # Carregar Vidro e ligar a porta
+        if key in glass_files:
+            g_name = glass_files[key]
+            glass, _ = load_obj_node(f"../models/{g_name}.obj", g_name,
+                                     color=(0.2, 0.3, 0.4), alpha=0.4, specular=(1,1,1), shininess=128)
+            door_node.add(glass)
+            
+        # Carregar Retrovisor e ligar a porta
+        if key in mirror_files:
+            m_name = mirror_files[key]
+            mirror, _ = load_obj_node(f"../models/{m_name}.obj", m_name, color=(0.1, 0.1, 0.1))
+            door_node.add(mirror)
+
+    # Outros Vidros (Parabrisas, Atras) - Estaticos
     parabrisas, _ = load_obj_node("../models/parabrisas.obj", "Parabrisas", 
                                color=(0.2, 0.3, 0.4), alpha=0.4, specular=(1,1,1), shininess=128)
-    vidros_resto, _ = load_obj_node("../models/vidros_resto.obj", "VidrosResto", 
-                                 color=(0.2, 0.3, 0.4), alpha=0.4, specular=(1,1,1), shininess=128)
-    car_orient.add(parabrisas, vidros_resto)
+    vidro_atras, _ = load_obj_node("../models/vidro_atras.obj", "VidroAtras", 
+                               color=(0.2, 0.3, 0.4), alpha=0.4, specular=(1,1,1), shininess=128)
+    car_orient.add(parabrisas, vidro_atras)
     
+    # --- Interior ---
+    # Banco (Racing Seat)
+    # Posicionar no lado do condutor (Esquerda)
+    seat_node, seat_model = load_obj_node("../models/racing_seat_completed.obj", "RacingSeat", 
+                                          color=(0.2, 0.2, 0.2), specular=(0.5, 0.5, 0.5), shininess=16.0, center=True)
+    
+    # Ajustar posicao (Tentativa Inicial)
     root.add(car_root)
     
-    car_ctrl = CarController(car_root, chassis, front_axle, rear_axle, front_center, rear_center, None, [])
+    car_ctrl = CarController(car_root, chassis, wheels, doors, volante_node)
     
     # --- Construcao da Garagem ---
     garage_root = Node("Garage", local=translate(10, 0, 10))

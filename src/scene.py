@@ -88,7 +88,13 @@ class Node:
                               self.mat_alpha,
                               self.mesh.texture_id,
                               self.mat_emission)
+            if self.mat_alpha < 1.0:
+                glDepthMask(GL_FALSE)
+                
             self.mesh.draw()
+            
+            if self.mat_alpha < 1.0:
+                glDepthMask(GL_TRUE)
             
         for c in self.children:
             c.draw(shader, world, VP)
