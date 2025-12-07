@@ -89,8 +89,10 @@ class CarController:
         for key, (node, center) in self.wheels.items():
             if not hasattr(node, 'roll_angle'): node.roll_angle = 0.0
             
-            # Rodas de tras maiores?
-            radius_factor = 0.66 if 'tras' in key else 1.0
+            # Rodas de tras maiores (30%)
+            radius_factor = 1.0/1.3 if 'tras' in key else 1.0 # Roll speed compensation
+            scale_factor = 1.3 if 'tras' in key else 1.0
+            
             node.roll_angle += wheel_rot_speed * radius_factor * dt * 10.0
             
             steer = 0.0
@@ -98,7 +100,8 @@ class CarController:
                 steer = self.steering_angle
                 
             rot_mat = rotate(math.radians(steer), (0, 1, 0)) @ \
-                      rotate(node.roll_angle, (1, 0, 0))
+                      rotate(node.roll_angle, (1, 0, 0)) @ \
+                      scale(scale_factor, scale_factor, scale_factor)
             
             node.local = get_pivot_transform(center, rot_mat)
 
@@ -402,6 +405,8 @@ def main():
             if key == glfw.KEY_4: car_ctrl.toggle_door('frente_esquerda')
             if key == glfw.KEY_5: car_ctrl.toggle_door('tras_direita')
             if key == glfw.KEY_6: car_ctrl.toggle_door('tras_esquerda')
+            if key == glfw.KEY_7: 
+                camera.mode = "FREE" if camera.mode != "FREE" else "ORBIT"
             
             if key == glfw.KEY_1: inputs['1'] = not inputs['1'] # Toggle ao pressionar
             if key == glfw.KEY_2:
