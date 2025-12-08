@@ -1,6 +1,7 @@
 
 import ctypes
 import os
+import math
 import numpy as np
 from PIL import Image
 from OpenGL.GL import *
@@ -204,3 +205,38 @@ def load_texture(path):
     except Exception as e:
         print(f"Texture error {path}: {e}")
         return None
+
+def create_sphere_mesh(radius=1.0, stacks=32, slices=32):
+    verts = []
+    indices = []
+
+    for i in range(stacks + 1):
+        phi = math.pi * i / stacks
+        for j in range(slices + 1):
+            theta = 2 * math.pi * j / slices
+            
+            x = radius * math.sin(phi) * math.cos(theta)
+            y = radius * math.cos(phi)
+            z = radius * math.sin(phi) * math.sin(theta)
+            
+            nx = x / radius
+            ny = y / radius
+            nz = z / radius
+            
+            u = j / slices
+            v = i / stacks
+            
+            verts.extend([x, y, z, nx, ny, nz, u, v])
+            
+    for i in range(stacks):
+        for j in range(slices):
+            first = (i * (slices + 1)) + j
+            second = first + slices + 1
+            
+            indices.extend([first, second, first + 1])
+            indices.extend([second, second + 1, first + 1])
+            
+    vertices = np.array(verts, dtype=np.float32)
+    indices_arr = np.array(indices, dtype=np.uint32)
+    
+    return Mesh(vertices, indices_arr)

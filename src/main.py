@@ -5,7 +5,7 @@ import numpy as np
 from OpenGL.GL import *
 
 from shader import ShaderProgram
-from scene import Node, create_grid_mesh, create_cube_mesh, load_texture
+from scene import Node, create_grid_mesh, create_cube_mesh, load_texture, create_sphere_mesh
 from camera import Camera
 from transform import translate, rotate, scale, perspective
 from obj_loader import OBJModel
@@ -177,9 +177,16 @@ def load_obj_node(path, name, color=None, alpha=1.0, specular=(1,1,1), shininess
             
         set_props(node)
         return node, model
+
     except Exception as e:
         print(f"Falha ao carregar {path}: {e}")
         return Node(name), None
+
+def apply_texture_recursive(node, texture_id):
+    if node.mesh:
+        node.mesh.texture_id = texture_id
+    for c in node.children:
+        apply_texture_recursive(c, texture_id)
 
 def main():
     if not glfw.init():
@@ -209,15 +216,28 @@ def main():
     
     # Construcao da Cena
     cube_mesh = create_cube_mesh(1.0)
-    grid_mesh = create_grid_mesh(100, 20)
+    # Chao
+    # Aumentar tamanho para 150 e repeticao para 30
+    grid_mesh = create_grid_mesh(150, 30) 
     
     root = Node("Root")
-    
-    # Chao
+
     floor = Node("Floor", mesh=grid_mesh, material_diffuse=(0.8, 0.8, 0.8))
-    tex_id = load_texture("../references/wall.jpg")
+    tex_id = load_texture("../models/grass.jpg")
     if tex_id: floor.mesh.texture_id = tex_id
     root.add(floor)
+
+    # Skybox - Esfera com textura panoramica
+    sky_tex = load_texture("../models/sky_panoramic.jpg")
+    if sky_tex:
+        sky_mesh = create_sphere_mesh(500.0, 64, 64) # Esfera grande
+        # Material emissivo (1,1,1) multiplicado pela textura. Diffuse/Spec a 0 para nao ter luz.
+        skybox = Node("Skybox", mesh=sky_mesh, 
+                      material_emission=(1.0, 1.0, 1.0), 
+                      material_diffuse=(0.0, 0.0, 0.0),
+                      material_specular=(0.0, 0.0, 0.0)) 
+        skybox.mesh.texture_id = sky_tex
+        root.add(skybox)
     
     # --- Construcao do Carro ---
     car_root = Node("CarRoot")
@@ -391,8 +411,14 @@ def main():
     garage_root = Node("Garage", local=translate(0, 0, 0)) # Assumindo origem centrada no .blend
     
     # 1. Estrutura Fora
+    # 1. Estrutura Fora
     struct_node, struct_model = load_obj_node("../models/garagem_parte_fora_paredes.obj", "GarageStruct", 
                                               color=(0.7, 0.7, 0.7), specular=(0.2, 0.2, 0.2), center=False)
+    
+    # Aplicar textura de parede
+    wall_tex = load_texture("../models/wall.jpg")
+    if wall_tex: apply_texture_recursive(struct_node, wall_tex)
+    
     garage_root.add(struct_node)
     
     # 2. Estrutura dentro
@@ -406,9 +432,13 @@ def main():
     garage_root.add(struct_node)
     
     # 4. Portoes
+    # Textura do Portao
+    gate_tex = load_texture("../models/garage_door.jpg")
+
     # -- Esquerda --
     gate_l_node, gate_l_model = load_obj_node("../models/garagem_portao.obj", "GateLeft", 
-                                              color=(0.4, 0.4, 0.4), center=False)
+                                              color=(0.8, 0.8, 0.8), center=False)
+    if gate_tex: apply_texture_recursive(gate_l_node, gate_tex)
     
     # Pivot em CIMA (Max Y)
     gl_min, gl_max = gate_l_model.get_bounds()
@@ -429,7 +459,8 @@ def main():
     # Ajuste MANUAL do Offset
     
     gate_r_node, _ = load_obj_node("../models/garagem_portao.obj", "GateRight", 
-                                   color=(0.4, 0.4, 0.4), center=False)
+                                   color=(0.8, 0.8, 0.8), center=False)
+    if gate_tex: apply_texture_recursive(gate_r_node, gate_tex)
     
     gate_r_mount = Node("GateR_Mount")
     gate_r_mount.add(gate_r_node)
@@ -664,9 +695,9 @@ def main():
         # Se mover para tras (velocidade < -0.1) ou pressionar 'S'
         reversing = inputs['s'] or car_ctrl.speed < -0.1
         if reversing:
-            luz_tras.mat_emission = (1.0, 0.0, 0.0) # Vermelho Brilhante
+            set_emission_recursive(luz_tras, (2.0, 0.0, 0.0)) # Vermelho Muito Brilhante
         else:
-            luz_tras.mat_emission = (0.2, 0.0, 0.0) # Vermelho Escuro (luzes traseiras ligadas?) ou Preto
+            set_emission_recursive(luz_tras, (0.3, 0.0, 0.0)) # Vermelho Escuro (luzes traseiras sempre ligadas)
         
         root.draw(shader, np.eye(4, dtype=np.float32), VP)
         

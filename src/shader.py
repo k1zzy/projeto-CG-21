@@ -101,12 +101,14 @@ void main(){
     vec3 viewDir = normalize(uViewPos - fPosW);
     
     vec3 albedo = uMaterialDiffuse;
+    vec3 texColorRGB = vec3(1.0);
     if (uHasTexture) {
         vec4 texColor = texture(uTexture, fTexCoord);
         albedo = texColor.rgb;
+        texColorRGB = texColor.rgb;
     }
     
-    vec3 result = uMaterialEmission; // Começar com emissão
+    vec3 result = uMaterialEmission * texColorRGB; // Emissão modulada por textura
     
     for(int i = 0; i < NR_LIGHTS; i++)
         result += CalcLight(lights[i], norm, viewDir, albedo);
