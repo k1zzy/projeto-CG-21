@@ -3,7 +3,7 @@ from OpenGL.GL import *
 import numpy as np
 from transform import normal_matrix
 
-# Vertex Shader
+# vertex shader
 VS = r"""
 #version 330 core
 layout(location=0) in vec3 aPos;
@@ -27,7 +27,7 @@ void main(){
 }
 """
 
-# Fragment Shader
+# fragment shader
 FS = r"""
 #version 330 core
 in vec3 fN;
@@ -39,7 +39,7 @@ out vec4 fragColor;
 struct Light {
     vec3 position;
     vec3 direction;
-    float cutoff; // Cosine of cutoff angle. Se < -0.9, trata como point light.
+    float cutoff; // cosseno do angulo de cutoff se menor que menos 09 trata como point light
     
     vec3 ambient;
     vec3 diffuse;
@@ -67,13 +67,13 @@ uniform bool uHasTexture;
 vec3 CalcLight(Light light, vec3 normal, vec3 viewDir, vec3 albedo) {
     vec3 lightDir = normalize(light.position - fPosW);
     
-    // Spotlight (Pode-se adicionar soft edges depois, por agora hard cutoff)
+    // spotlight pode adicionar soft edges depois por agora hard cutoff
     float theta = dot(lightDir, normalize(-light.direction));
     
     float intensity = 1.0;
-    if(light.cutoff > -0.9) { // É um spotlight
+    if(light.cutoff > -0.9) { // e um spotlight
         if(theta > light.cutoff) {
-            // Dentro do cone
+            // dentro do cone
             intensity = 1.0;
         } else {
             intensity = 0.0;
@@ -82,10 +82,10 @@ vec3 CalcLight(Light light, vec3 normal, vec3 viewDir, vec3 albedo) {
     
     if (intensity == 0.0) return vec3(0.0);
     
-    // Difusa
+    // difusa
     float diff = max(dot(normal, lightDir), 0.0);
     
-    // Especular
+    // especular
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
     
@@ -108,7 +108,7 @@ void main(){
         texColorRGB = texColor.rgb;
     }
     
-    vec3 result = uMaterialEmission * texColorRGB; // Emissão modulada por textura
+    vec3 result = uMaterialEmission * texColorRGB; // emissao modulada por textura
     
     for(int i = 0; i < NR_LIGHTS; i++)
         result += CalcLight(lights[i], norm, viewDir, albedo);
@@ -129,7 +129,7 @@ class ShaderProgram:
         if not glGetProgramiv(self.prog, GL_LINK_STATUS):
             raise RuntimeError(glGetProgramInfoLog(self.prog).decode())
             
-        # Cache uniform locations
+        # cache uniform locations
         self.loc_uM = glGetUniformLocation(self.prog, "uM")
         self.loc_uVP = glGetUniformLocation(self.prog, "uVP")
         self.loc_uN = glGetUniformLocation(self.prog, "uN")
@@ -145,7 +145,7 @@ class ShaderProgram:
         self.loc_has_tex = glGetUniformLocation(self.prog, "uHasTexture")
         self.loc_tex = glGetUniformLocation(self.prog, "uTexture")
         
-        # Light locations
+        # light locations
         self.light_locs = []
         for i in range(4):
             self.light_locs.append({

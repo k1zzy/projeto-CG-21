@@ -8,10 +8,8 @@ from OpenGL.GL import *
 
 class Mesh:
     def __init__(self, vertices, indices, texture_id=None):
-        """
-        vertices: numpy array of float32, interleaved [x,y,z, nx,ny,nz, u,v]
-        indices: numpy array of uint32
-        """
+        # vertices numpy array de float32 interleaved x y z nx ny nz u v
+        # indices numpy array de uint32
         self.count = indices.size
         self.texture_id = texture_id
         
@@ -27,18 +25,18 @@ class Mesh:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
         
-        # Stride: 3 pos + 3 norm + 2 uv = 8 floats * 4 bytes = 32 bytes
+        # stride 3 pos mais 3 norm mais 2 uv igual 8 floats vezes 4 bytes igual 32 bytes
         stride = 8 * 4
         
-        # Posicao (loc 0)
+        # posicao loc 0
         glEnableVertexAttribArray(0)
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
         
-        # Normal (loc 1)
+        # normal loc 1
         glEnableVertexAttribArray(1)
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(12))
         
-        # TexCoord (loc 2)
+        # texcoord loc 2
         glEnableVertexAttribArray(2)
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(24))
         
@@ -67,7 +65,7 @@ class Node:
         self.children = []
         self.mesh = mesh
         
-        # Propriedades do material
+        # propriedades do material
         self.mat_ambient = material_ambient
         self.mat_diffuse = material_diffuse
         self.mat_specular = material_specular
@@ -119,15 +117,15 @@ def create_grid_mesh(size=100, tiles=20):
             u1 = i+1
             v1 = j+1
             
-            # Normal e sempre para cima (0, 1, 0)
-            # Quad vertices (2 triangulos)
+            # normal e sempre pra cima tipo 0 1 0
+            # quad vertices 2 triangulos
             
-            # Triangulo 1
+            # triangulo 1
             verts.extend([x0, 0, z0, 0, 1, 0, 0, 0])
             verts.extend([x0, 0, z1, 0, 1, 0, 0, 1])
             verts.extend([x1, 0, z0, 0, 1, 0, 1, 0])
             
-            # Triangulo 2
+            # triangulo 2
             verts.extend([x1, 0, z0, 0, 1, 0, 1, 0])
             verts.extend([x0, 0, z1, 0, 1, 0, 0, 1])
             verts.extend([x1, 0, z1, 0, 1, 0, 1, 1])
@@ -139,8 +137,8 @@ def create_grid_mesh(size=100, tiles=20):
 
 def create_cube_mesh(size=1.0):
     s = size * 0.5
-    # vertices: x,y,z, nx,ny,nz, u,v
-    # 6 faces * 4 verts = 24 verts
+    # vertices x y z nx ny nz u v
+    # 6 faces vezes 4 verts igual 24 verts
     verts = [
         # Front
         -s, -s,  s,  0, 0, 1,  0, 0,

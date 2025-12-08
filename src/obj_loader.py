@@ -17,11 +17,11 @@ class OBJModel:
         self.batches = []
         
         self._load_obj(filename)
-        # self._build_meshes() # Adiar construcao de malhas ate depois da centralizacao opcional
+        # adiar construcao de malhas ate depois da centralizacao opcional
 
     def get_center(self):
         if not self.vertices: return (0,0,0)
-        # Calcular centro
+        # calcular centro
         min_v = np.min(self.vertices, axis=0)
         max_v = np.max(self.vertices, axis=0)
         center = (min_v + max_v) / 2.0
@@ -131,9 +131,9 @@ class OBJModel:
             if mat not in temp_batches: temp_batches[mat] = []
             
             verts = face["verts"]
-            # Calcular normal flat se em falta
+            # calcular normal flat se em falta
             if all(v[2] < 0 for v in verts): # verificacao simplificada
-                # ... (calculo de normais omitido por brevidade, assumindo normais existentes ou 0,1,0)
+                # calculo de normais omitido por brevidade assumindo normais existentes ou 0 1 0
                 fn = (0, 1, 0)
             else: fn = (0, 1, 0)
 
@@ -159,7 +159,7 @@ class OBJModel:
         root = Node(name)
         for batch in self.batches:
             mat = batch["material"]
-            # Create a child node for each material batch
+            # create a child node for each material batch
             child = Node(name + "_Mesh", mesh=batch["mesh"], 
                          material_diffuse=mat["diffuse"])
             root.add(child)
