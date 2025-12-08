@@ -222,7 +222,10 @@ def main():
     
     root = Node("Root")
 
-    floor = Node("Floor", mesh=grid_mesh, material_diffuse=(0.8, 0.8, 0.8))
+    floor = Node("Floor", mesh=grid_mesh, 
+                 material_diffuse=(0.8, 0.8, 0.8),
+                 material_specular=(0.0, 0.0, 0.0),  # Sem reflexao especular
+                 material_shininess=1.0)  # Superficie mate
     tex_id = load_texture("../models/grass.jpg")
     if tex_id: floor.mesh.texture_id = tex_id
     root.add(floor)
@@ -239,6 +242,16 @@ def main():
         skybox.mesh.texture_id = sky_tex
         root.add(skybox)
     
+    # Sol - Esfera brilhante como fonte de luz
+    sun_pos = np.array([200.0, 150.0, 200.0], dtype=np.float32)  # Posicao do sol
+    sun_mesh = create_sphere_mesh(20.0, 32, 32)  # Esfera de raio 20
+    sun = Node("Sun", mesh=sun_mesh,
+               local=translate(sun_pos[0], sun_pos[1], sun_pos[2]),
+               material_emission=(3.0, 2.5, 1.5),  # Amarelo/laranja brilhante
+               material_diffuse=(0.0, 0.0, 0.0),
+               material_specular=(0.0, 0.0, 0.0))
+    root.add(sun)
+    
     # --- Construcao do Carro ---
     car_root = Node("CarRoot")
     
@@ -247,9 +260,9 @@ def main():
     car_orient = Node("CarOrient", local=rotate(math.radians(180), (0, 1, 0)))
     car_root.add(car_orient)
 
-    # Chassis (Pintura Vermelha)
+    # Chassis (Pintura Azul)
     chassis, _ = load_obj_node("../models/carrocaria.obj", "ChassisModel", 
-                            color=(0.8, 0.0, 0.0), specular=(1.0, 1.0, 1.0), shininess=64.0, center=False)
+                            color=(0.0, 0.3, 0.9), specular=(1.0, 1.0, 1.0), shininess=64.0, center=False)
     car_orient.add(chassis)
     
     # Luzes
@@ -347,7 +360,7 @@ def main():
     for key, name in door_files.items():
         # Carregar porta
         door_node, door_model = load_obj_node(f"../models/{name}.obj", name, 
-                                               color=(0.8, 0.0, 0.0), specular=(1.0, 1.0, 1.0), shininess=64.0, center=True)
+                                               color=(0.0, 0.3, 0.9), specular=(1.0, 1.0, 1.0), shininess=64.0, center=True)
         
         # Calcular Pivot baseado nos limites (Bounding Box)
         # Esquerda -> Min X, Direita -> Max X
@@ -644,10 +657,10 @@ def main():
         shader.set_view_pos(eye_pos)
         
         # Luzes
-        # Luzes da Cena (Point Lights, cutoff=-1)
-        # Usar cutoff=-1.0 garante que sao tratadas como point lights
-        shader.set_light(0, (10, 20, 10), (0.2, 0.2, 0.2), (0.9, 0.9, 0.9), (1.0, 1.0, 1.0), cutoff=-1.0)
-        shader.set_light(1, (-10, 10, -10), (0.1, 0.1, 0.1), (0.4, 0.4, 0.6), (0.4, 0.4, 0.4), cutoff=-1.0)
+        # Sol como fonte de luz principal
+        shader.set_light(0, sun_pos, (0.3, 0.3, 0.2), (1.0, 0.95, 0.8), (1.0, 1.0, 0.9), cutoff=-1.0)
+        # Luz ambiente suave
+        shader.set_light(1, (0, 50, 0), (0.2, 0.2, 0.25), (0.3, 0.3, 0.4), (0.2, 0.2, 0.2), cutoff=-1.0)
         
         # Logica dos Farois
         headlights_on = inputs['1']
