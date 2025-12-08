@@ -15,6 +15,12 @@ WIN_WIDTH = 1280
 WIN_HEIGHT = 720
 TITLE = "Projecto CG - Grupo 21"
 
+# Auxiliar para rotacao de pivo: T(P) * R * T(-P)
+def get_pivot_transform(pivot, rotation_matrix):
+    return translate(pivot[0], pivot[1], pivot[2]) @ \
+           rotation_matrix @ \
+           translate(-pivot[0], -pivot[1], -pivot[2])
+
 class CarController:
     def __init__(self, root_node, chassis, wheels_dict, doors_dict, steering_wheel):
         self.root = root_node
@@ -80,11 +86,6 @@ class CarController:
         # Rodar Rodas (visual)
         wheel_rot_speed = self.speed * 2.0 
         
-        # Auxiliar para rotacao de pivo: T(P) * R * T(-P)
-        def get_pivot_transform(pivot, rotation_matrix):
-            return translate(pivot[0], pivot[1], pivot[2]) @ \
-                   rotation_matrix @ \
-                   translate(-pivot[0], -pivot[1], -pivot[2])
 
         for key, (node, center) in self.wheels.items():
             if not hasattr(node, 'roll_angle'): node.roll_angle = 0.0
@@ -129,16 +130,31 @@ class CarController:
             self.door_states[door_key]['open'] = not self.door_states[door_key]['open']
 
 class GarageController:
-    def __init__(self, door_node):
-        self.door = door_node
+    def __init__(self, left_gate, right_gate, left_pivot, right_pivot):
+        self.left_gate = left_gate
+        self.right_gate = right_gate
+        self.left_pivot = left_pivot
+        self.right_pivot = right_pivot
+        
         self.is_open = False
-        self.open_height = 0.0
-        self.max_height = 2.5
+        self.angle = 0.0
+        self.max_angle = 90.0 # Graus
         
     def update(self, dt):
-        target = self.max_height if self.is_open else 0.0
-        self.open_height += (target - self.open_height) * 2.0 * dt
-        self.door.local = translate(0, self.open_height, 0)
+        target = self.max_angle if self.is_open else 0.0
+        self.angle += (target - self.angle) * 2.0 * dt
+        
+        # Rotacao em torno do eixo X (Abrir para cima)
+        # Assumindo dobradica no topo.
+        # Para abrir "para fora/cima", a rotacao deve ser negativa (Regra da mao direita no eixo X +).
+        # Se Z+ e para tras (dentro da garagem? ou fora? OpenGL: Z+ e 'para ca' da camara).
+        # Carro olha para -Z. Garagem abre para Z?
+        # Vamos tentar -Angle.
+        
+        rot = rotate(math.radians(-self.angle), (1, 0, 0))
+        
+        self.left_gate.local = get_pivot_transform(self.left_pivot, rot)
+        self.right_gate.local = get_pivot_transform(self.right_pivot, rot)
         
     def toggle(self):
         self.is_open = not self.is_open
@@ -371,18 +387,70 @@ def main():
     
     car_ctrl = CarController(car_root, chassis, wheels, doors, volante_node)
     
-    # --- Construcao da Garagem ---
-    garage_root = Node("Garage", local=translate(10, 0, 10))
-    g_walls = Node("GWalls", local=scale(6.0, 3.0, 6.0), mesh=cube_mesh, material_diffuse=(0.6, 0.6, 0.6))
-    garage_root.add(g_walls)
+    # --- Construcao da Garagem (Modelos NOVOS) ---
+    garage_root = Node("Garage", local=translate(0, 0, 0)) # Assumindo origem centrada no .blend
     
-    g_door_mount = Node("GDoorMount", local=translate(0, 0, 3.0))
-    g_door = Node("GDoor", local=scale(4.0, 2.5, 0.2), mesh=cube_mesh, material_diffuse=(0.4, 0.2, 0.0))
-    g_door_mount.add(g_door)
-    garage_root.add(g_door_mount)
+    # 1. Estrutura Fora
+    struct_node, struct_model = load_obj_node("../models/garagem_parte_fora_paredes.obj", "GarageStruct", 
+                                              color=(0.7, 0.7, 0.7), specular=(0.2, 0.2, 0.2), center=False)
+    garage_root.add(struct_node)
+    
+    # 2. Estrutura dentro
+    struct_node, struct_model = load_obj_node("../models/garagem_parte_dentro_luzes.obj", "GarageLights", 
+                                              color=(0.7, 0.7, 0.7), specular=(0.2, 0.2, 0.2), center=False)
+    garage_root.add(struct_node)
+
+    # 3. Piso
+    struct_node, floor_model = load_obj_node("../models/garagem_parte_dentro_pilares.obj", "GaragePillars", 
+                                            color=(0.7, 0.7, 0.7), specular=(0.2, 0.2, 0.2), center=False)
+    garage_root.add(struct_node)
+    
+    # 4. Portoes
+    # -- Esquerda --
+    gate_l_node, gate_l_model = load_obj_node("../models/garagem_portao.obj", "GateLeft", 
+                                              color=(0.4, 0.4, 0.4), center=False)
+    
+    # Pivot em CIMA (Max Y)
+    gl_min, gl_max = gate_l_model.get_bounds()
+    # Centro X para simetria
+    center_x = (gl_min[0] + gl_max[0]) / 2.0
+    
+    # Pivot: (Centro X do portao, Topo Y, Frente Z?)
+    # Usando Min Z como "frente" da folha do portao.
+    gate_pivot = (center_x, gl_max[1], gl_min[2]) 
+    
+    gate_l_mount = Node("GateL_Mount") 
+    gate_l_mount.add(gate_l_node)
+    garage_root.add(gate_l_mount)
+
+    # -- Direita --
+    # O modelo e o mesmo. Se estiver centrado na origem, temos de mover para os lados.
+    # Se estiver na Esquerda (global), temos de mover para a Direita.
+    # Ajuste MANUAL do Offset
+    
+    gate_r_node, _ = load_obj_node("../models/garagem_portao.obj", "GateRight", 
+                                   color=(0.4, 0.4, 0.4), center=False)
+    
+    gate_r_mount = Node("GateR_Mount")
+    gate_r_mount.add(gate_r_node)
+    
+    # AJUSTE AQUI: Offset para separar os portoes
+    # Se estao sobrepostos, tente valores como 5.0, 6.0, 10.0, ou negativos.
+    # Se 'center_x' for a posicao original (ex: -3), entao -2*(-3) = +6 move para +3.
+    # Se estiverem a sobrepor-se, talvez o offset automatico tenha sido 0?
+    
+    gate_r_offset_val = 28.3 # TENTA MUDAR ISTO (Ex: 5.0, 6.0, -6.0)
+    
+    gate_r_offset = Node("GateR_Offset", local=translate(gate_r_offset_val, 0, 0))
+    gate_r_offset.add(gate_r_mount)
+    garage_root.add(gate_r_offset)
     
     root.add(garage_root)
-    garage_ctrl = GarageController(g_door)
+    
+    # Controlador
+    # Nota: Passamos gate_r_mount (que roda no sitio 'errado'), mas como esta dentro do gate_r_offset,
+    # visualmente aparece no sitio certo a rodar sobre o seu proprio eixo (que e igual ao da esquerda).
+    garage_ctrl = GarageController(gate_l_mount, gate_r_mount, gate_pivot, gate_pivot)
     
     # Estado de Input
     inputs = {'w': False, 's': False, 'a': False, 'd': False, 'q': False, 'e': False, '1': False}

@@ -1,0 +1,34 @@
+# Blender 5.0.0 MTL File: 'garagem.blend'
+# www.blender.org
+
+newmtl Mat_Dach
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd D:/Modelling/Textures/concrete_tile_facade_4k.blend/textures/concrete_tile_facade_diff_4k.jpg
+map_Ns D:/Modelling/Textures/concrete_tile_facade_4k.blend/textures/concrete_tile_facade_rough_4k.exr
+map_Bump -bm 1.000000 D:/Modelling/Textures/concrete_tile_facade_4k.blend/textures/concrete_tile_facade_nor_gl_4k.exr
+
+newmtl Mat_FactoryWall
+Ka 0.636364 0.636364 0.636364
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Ns D:/Modelling/Textures/factory_wall_4k.blend/textures/factory_wall_rough_4k.jpg
+map_Bump -bm 2.000000 D:/Modelling/Textures/factory_wall_4k.blend/textures/factory_wall_nor_gl_4k.exr
+
+newmtl Mat_Tor
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.219328 0.219328 0.219328
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
