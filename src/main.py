@@ -149,7 +149,7 @@ class GarageController:
         # pra abrir pra fora e pra cima a rotacao tem que ser negativa tipo regra da mao direita
         # z positivo e pra tras ou pra frente sei la opengl e confuso
         # carro olha pra menos z e garagem abre pra z
-        # vamo tentar angulo negativo
+        # vamos tentar angulo negativo
         
         rot = rotate(math.radians(-self.angle), (1, 0, 0))
         

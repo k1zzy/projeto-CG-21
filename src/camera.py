@@ -100,5 +100,5 @@ class Camera:
             return lookAt(eye, self.center, self.up), eye
         else:
             # free first person etc
-            # assuma que position e front tao atualizados
+            # assume que position e front tao atualizados
             return lookAt(self.position, self.position + self.front, self.up), self.position
