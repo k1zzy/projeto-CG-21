@@ -3,7 +3,7 @@ from OpenGL.GL import *
 import numpy as np
 from transform import normal_matrix
 
-# Vertex Shader
+# vertex shader
 VS = r"""
 #version 330 core
 layout(location=0) in vec3 aPos;
@@ -27,7 +27,7 @@ void main(){
 }
 """
 
-# Fragment Shader
+# fragment shader
 FS = r"""
 #version 330 core
 in vec3 fN;
@@ -38,19 +38,28 @@ out vec4 fragColor;
 
 struct Light {
     vec3 position;
+    vec3 direction;
+    float cutoff; // cosseno do angulo de cutoff se menor que menos 09 trata como point light
+    
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+    
+    float constant;
+    float linear;
+    float quadratic;
 };
 
-#define NR_LIGHTS 2
+#define NR_LIGHTS 4
 uniform Light lights[NR_LIGHTS];
 
 uniform vec3 uViewPos;
 uniform vec3 uMaterialAmbient;
 uniform vec3 uMaterialDiffuse;
 uniform vec3 uMaterialSpecular;
+uniform vec3 uMaterialEmission;
 uniform float uMaterialShininess;
+uniform float uMaterialAlpha;
 
 uniform sampler2D uTexture;
 uniform bool uHasTexture;
@@ -58,10 +67,25 @@ uniform bool uHasTexture;
 vec3 CalcLight(Light light, vec3 normal, vec3 viewDir, vec3 albedo) {
     vec3 lightDir = normalize(light.position - fPosW);
     
-    // Diffuse
+    // spotlight pode adicionar soft edges depois por agora hard cutoff
+    float theta = dot(lightDir, normalize(-light.direction));
+    
+    float intensity = 1.0;
+    if(light.cutoff > -0.9) { // e um spotlight
+        if(theta > light.cutoff) {
+            // dentro do cone
+            intensity = 1.0;
+        } else {
+            intensity = 0.0;
+        }
+    }
+    
+    if (intensity == 0.0) return vec3(0.0);
+    
+    // difusa
     float diff = max(dot(normal, lightDir), 0.0);
     
-    // Specular
+    // especular
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), uMaterialShininess);
     
@@ -69,7 +93,7 @@ vec3 CalcLight(Light light, vec3 normal, vec3 viewDir, vec3 albedo) {
     vec3 diffuse  = light.diffuse  * diff * albedo;
     vec3 specular = light.specular * spec * uMaterialSpecular;
     
-    return (ambient + diffuse + specular);
+    return (ambient + diffuse + specular) * intensity;
 }
 
 void main(){
@@ -77,16 +101,19 @@ void main(){
     vec3 viewDir = normalize(uViewPos - fPosW);
     
     vec3 albedo = uMaterialDiffuse;
+    vec3 texColorRGB = vec3(1.0);
     if (uHasTexture) {
         vec4 texColor = texture(uTexture, fTexCoord);
         albedo = texColor.rgb;
+        texColorRGB = texColor.rgb;
     }
     
-    vec3 result = vec3(0.0);
+    vec3 result = uMaterialEmission * texColorRGB; // emissao modulada por textura
+    
     for(int i = 0; i < NR_LIGHTS; i++)
         result += CalcLight(lights[i], norm, viewDir, albedo);
         
-    fragColor = vec4(result, 1.0);
+    fragColor = vec4(result, uMaterialAlpha);
 }
 """
 
@@ -95,16 +122,14 @@ class ShaderProgram:
         self.prog = glCreateProgram()
         vs = self._compile(VS, GL_VERTEX_SHADER)
         fs = self._compile(FS, GL_FRAGMENT_SHADER)
-        glAttachShader(self.prog, vs)
-        glAttachShader(self.prog, fs)
+        glAttachShader(self.prog, vs); glAttachShader(self.prog, fs)
         glLinkProgram(self.prog)
-        glDeleteShader(vs)
-        glDeleteShader(fs)
+        glDeleteShader(vs); glDeleteShader(fs)
         
         if not glGetProgramiv(self.prog, GL_LINK_STATUS):
             raise RuntimeError(glGetProgramInfoLog(self.prog).decode())
             
-        # Cache uniform locations
+        # cache uniform locations
         self.loc_uM = glGetUniformLocation(self.prog, "uM")
         self.loc_uVP = glGetUniformLocation(self.prog, "uVP")
         self.loc_uN = glGetUniformLocation(self.prog, "uN")
@@ -113,16 +138,20 @@ class ShaderProgram:
         self.loc_mat_amb = glGetUniformLocation(self.prog, "uMaterialAmbient")
         self.loc_mat_diff = glGetUniformLocation(self.prog, "uMaterialDiffuse")
         self.loc_mat_spec = glGetUniformLocation(self.prog, "uMaterialSpecular")
+        self.loc_mat_emis = glGetUniformLocation(self.prog, "uMaterialEmission")
         self.loc_mat_shiny = glGetUniformLocation(self.prog, "uMaterialShininess")
+        self.loc_mat_alpha = glGetUniformLocation(self.prog, "uMaterialAlpha")
         
         self.loc_has_tex = glGetUniformLocation(self.prog, "uHasTexture")
         self.loc_tex = glGetUniformLocation(self.prog, "uTexture")
         
-        # Light locations
+        # light locations
         self.light_locs = []
-        for i in range(2):
+        for i in range(4):
             self.light_locs.append({
                 'pos': glGetUniformLocation(self.prog, f"lights[{i}].position"),
+                'dir': glGetUniformLocation(self.prog, f"lights[{i}].direction"),
+                'cut': glGetUniformLocation(self.prog, f"lights[{i}].cutoff"),
                 'amb': glGetUniformLocation(self.prog, f"lights[{i}].ambient"),
                 'diff': glGetUniformLocation(self.prog, f"lights[{i}].diffuse"),
                 'spec': glGetUniformLocation(self.prog, f"lights[{i}].specular")
@@ -147,11 +176,13 @@ class ShaderProgram:
     def set_view_pos(self, pos):
         glUniform3fv(self.loc_uViewPos, 1, np.array(pos, dtype=np.float32))
 
-    def set_material(self, ambient, diffuse, specular, shininess, texture_id=None):
+    def set_material(self, ambient, diffuse, specular, shininess, alpha=1.0, texture_id=None, emission=(0,0,0)):
         glUniform3fv(self.loc_mat_amb, 1, np.array(ambient, dtype=np.float32))
         glUniform3fv(self.loc_mat_diff, 1, np.array(diffuse, dtype=np.float32))
         glUniform3fv(self.loc_mat_spec, 1, np.array(specular, dtype=np.float32))
+        glUniform3fv(self.loc_mat_emis, 1, np.array(emission, dtype=np.float32))
         glUniform1f(self.loc_mat_shiny, shininess)
+        glUniform1f(self.loc_mat_alpha, alpha)
         
         if texture_id is not None:
             glUniform1i(self.loc_has_tex, 1)
@@ -161,10 +192,12 @@ class ShaderProgram:
         else:
             glUniform1i(self.loc_has_tex, 0)
 
-    def set_light(self, index, position, ambient, diffuse, specular):
+    def set_light(self, index, position, ambient, diffuse, specular, direction=(0,-1,0), cutoff=-1.0):
         if 0 <= index < len(self.light_locs):
             locs = self.light_locs[index]
             glUniform3fv(locs['pos'], 1, np.array(position, dtype=np.float32))
+            glUniform3fv(locs['dir'], 1, np.array(direction, dtype=np.float32))
+            glUniform1f(locs['cut'], cutoff)
             glUniform3fv(locs['amb'], 1, np.array(ambient, dtype=np.float32))
             glUniform3fv(locs['diff'], 1, np.array(diffuse, dtype=np.float32))
             glUniform3fv(locs['spec'], 1, np.array(specular, dtype=np.float32))

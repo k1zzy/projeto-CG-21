@@ -17,6 +17,23 @@ class OBJModel:
         self.batches = []
         
         self._load_obj(filename)
+        # adiar construcao de malhas ate depois da centralizacao opcional
+
+    def get_center(self):
+        if not self.vertices: return (0,0,0)
+        # calcular centro
+        min_v = np.min(self.vertices, axis=0)
+        max_v = np.max(self.vertices, axis=0)
+        center = (min_v + max_v) / 2.0
+        return center
+
+    def get_bounds(self):
+        if not self.vertices: return (0,0,0), (0,0,0)
+        min_v = np.min(self.vertices, axis=0)
+        max_v = np.max(self.vertices, axis=0)
+        return min_v, max_v
+
+    def build(self):
         self._build_meshes()
 
     def _load_obj(self, filename):
@@ -58,7 +75,7 @@ class OBJModel:
                             vn_idx = resolve_index(tokens[2], len(self.normals)) if len(tokens) > 2 else -1
                             face_verts.append((v_idx, vt_idx, vn_idx))
                         
-                        # Triangulate
+                        # Triangular
                         for i in range(1, len(face_verts) - 1):
                             self.faces.append({
                                 "material": current_material,
@@ -114,9 +131,9 @@ class OBJModel:
             if mat not in temp_batches: temp_batches[mat] = []
             
             verts = face["verts"]
-            # Calculate flat normal if missing
-            if all(v[2] < 0 for v in verts): # simplified check
-                # ... (normal calculation omitted for brevity, assuming normals exist or 0,1,0)
+            # calcular normal flat se em falta
+            if all(v[2] < 0 for v in verts): # verificacao simplificada
+                # calculo de normais omitido por brevidade assumindo normais existentes ou 0 1 0
                 fn = (0, 1, 0)
             else: fn = (0, 1, 0)
 
@@ -142,7 +159,7 @@ class OBJModel:
         root = Node(name)
         for batch in self.batches:
             mat = batch["material"]
-            # Create a child node for each material batch
+            # create a child node for each material batch
             child = Node(name + "_Mesh", mesh=batch["mesh"], 
                          material_diffuse=mat["diffuse"])
             root.add(child)
